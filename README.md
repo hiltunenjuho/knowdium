@@ -26,7 +26,7 @@ Finnish and Russian translations are currently in beta. A brief notice is shown 
 
 ## Run locally
 
-The hero uses transparent WebM clips and a poster from `public/hero-videos`. Its MP4 fallback stores colour and alpha side by side and is composited with WebGL; if playback or rendering fails, the poster remains visible. The animation respects the device's reduced-motion preference and pauses while the tab is hidden.
+The hero uses transparent WebM clips and a poster from `public/hero-videos`. Its MP4 fallback stores colour and alpha side by side and is composited with WebGL; if playback or rendering fails, the poster remains visible. Clips play at 1.5x speed with a subtle softening filter to smooth their edges. The animation respects the device's reduced-motion preference and pauses while the tab is hidden.
 
 Requires Node.js and npm:
 

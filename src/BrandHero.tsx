@@ -4,6 +4,7 @@ const turns = ['horizontal-forward', 'horizontal-reverse', 'vertical-forward', '
 type Turn = typeof turns[number];
 type Format = 'webm' | 'mp4' | 'failed';
 
+const HERO_PLAYBACK_RATE = 1.5;
 const asset = (name: string) => `${import.meta.env.BASE_URL}hero-videos/${name}`;
 const poster = asset('poster.png');
 
@@ -44,6 +45,7 @@ function WebmPlayer({ turn, onEnded, onFailure }: PlayerProps) {
     const video = videoRef.current;
     if (!video) return;
     let active = true;
+    video.playbackRate = HERO_PLAYBACK_RATE;
     video.play().catch((error: unknown) => {
       if (active) reportFailure(error);
     });
@@ -200,6 +202,7 @@ function Mp4Player({ turn, onEnded, onFailure }: PlayerProps) {
       event.preventDefault();
       reportFailure(new Error('The hero video graphics context was lost'));
     };
+    video.playbackRate = HERO_PLAYBACK_RATE;
     video.addEventListener('playing', onPlaying);
     canvas.addEventListener('webglcontextlost', onContextLost);
     video.play().then(() => {
