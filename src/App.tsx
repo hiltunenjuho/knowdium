@@ -1,399 +1,29 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import './App.css';
-import { fetchCategories, loadSurvivalQuestions, loadTriviaQuestions, NoQuestionsError, TriviaApiError, type TriviaCategory, type TriviaQuestion } from './data/triviaApi';
+import { loadSurvivalQuestions, loadTriviaQuestions, NoQuestionsError, TriviaApiError, TRIVIA_CATEGORIES, type TriviaDifficulty, type TriviaQuestion } from './data/triviaApi';
 import { translateQuestion, type TranslatedQuestion, type TranslationLanguage } from './data/translateTrivia';
-import { createBrandEdges, type BrandEdge } from './brandExtrusion';
+import BrandHero from './BrandHero';
+import { messages, type Language, type MessageKey } from './messages';
 
-type Language = 'fi' | 'en' | 'ru';
 type Theme = 'light' | 'dark';
 type GameMode = 'classic' | 'blitz' | 'survival';
 type Phase = 'home' | 'playing' | 'results';
 
-const categoryTranslations: Record<number, Record<'fi' | 'ru', string>> = {
-  9: { fi: 'Yleistieto', ru: 'Общие знания' },
-  10: { fi: 'Viihde: kirjat', ru: 'Развлечения: книги' },
-  11: { fi: 'Viihde: elokuvat', ru: 'Развлечения: кино' },
-  12: { fi: 'Viihde: musiikki', ru: 'Развлечения: музыка' },
-  13: { fi: 'Viihde: musikaalit ja teatteri', ru: 'Развлечения: мюзиклы и театр' },
-  14: { fi: 'Viihde: televisio', ru: 'Развлечения: телевидение' },
-  15: { fi: 'Viihde: videopelit', ru: 'Развлечения: видеоигры' },
-  16: { fi: 'Viihde: lautapelit', ru: 'Развлечения: настольные игры' },
-  17: { fi: 'Tiede ja luonto', ru: 'Наука и природа' },
-  18: { fi: 'Tiede: tietokoneet', ru: 'Наука: компьютеры' },
-  19: { fi: 'Tiede: matematiikka', ru: 'Наука: математика' },
-  20: { fi: 'Mytologia', ru: 'Мифология' },
-  21: { fi: 'Urheilu', ru: 'Спорт' },
-  22: { fi: 'Maantiede', ru: 'География' },
-  23: { fi: 'Historia', ru: 'История' },
-  24: { fi: 'Politiikka', ru: 'Политика' },
-  25: { fi: 'Taide', ru: 'Искусство' },
-  26: { fi: 'Julkkikset', ru: 'Знаменитости' },
-  27: { fi: 'Eläimet', ru: 'Животные' },
-  28: { fi: 'Ajoneuvot', ru: 'Транспорт' },
-  29: { fi: 'Viihde: sarjakuvat', ru: 'Развлечения: комиксы' },
-  30: { fi: 'Tiede: laitteet', ru: 'Наука: гаджеты' },
-  31: { fi: 'Viihde: japanilainen anime ja manga', ru: 'Развлечения: японские аниме и манга' },
-  32: { fi: 'Viihde: piirretyt ja animaatio', ru: 'Развлечения: мультфильмы и анимация' },
+const categoryTranslations: Record<string, Record<'fi' | 'ru', string>> = {
+  general_knowledge: { fi: 'Yleistieto', ru: 'Общие знания' },
+  arts_and_literature: { fi: 'Taide ja kirjallisuus', ru: 'Искусство и литература' },
+  film_and_tv: { fi: 'Elokuvat ja televisio', ru: 'Кино и телевидение' },
+  food_and_drink: { fi: 'Ruoka ja juoma', ru: 'Еда и напитки' },
+  geography: { fi: 'Maantieto', ru: 'География' },
+  history: { fi: 'Historia', ru: 'История' },
+  music: { fi: 'Musiikki', ru: 'Музыка' },
+  science: { fi: 'Tiede', ru: 'Наука' },
+  society_and_culture: { fi: 'Yhteiskunta ja kulttuuri', ru: 'Общество и культура' },
+  sport_and_leisure: { fi: 'Urheilu ja vapaa-aika', ru: 'Спорт и досуг' },
 };
 
-const brandTurns = ['horizontal-forward', 'horizontal-reverse', 'vertical-forward', 'vertical-reverse'] as const;
 
-function randomBrandTurn() {
-  return brandTurns[Math.floor(Math.random() * brandTurns.length)];
-}
 
-function BrandHero() {
-  const [turn, setTurn] = useState(randomBrandTurn);
-  const [edges, setEdges] = useState<BrandEdge[]>([]);
-
-  useEffect(() => {
-    let active = true;
-    const updateEdges = () => {
-      if (!active) return;
-      try {
-        setEdges(createBrandEdges());
-      } catch (error) {
-        console.error('Unable to build the Knowdium hero extrusion:', error);
-      }
-    };
-    document.fonts.addEventListener('loadingdone', updateEdges);
-    document.fonts.ready.then(updateEdges).catch((error: unknown) => {
-      console.error('Unable to load fonts for the Knowdium hero:', error);
-    });
-    return () => {
-      active = false;
-      document.fonts.removeEventListener('loadingdone', updateEdges);
-    };
-  }, []);
-
-  return (
-    <div
-      className={`brand-3d turn-${turn}`}
-      onAnimationIteration={(event) => {
-        if (event.target === event.currentTarget && event.animationName === 'brand-turn') {
-          setTurn(randomBrandTurn());
-        }
-      }}
-    >
-      <div className="brand-extrusion">
-        {edges.map((edge, index) => (
-          <span
-            className={`brand-outline-edge is-${edge.axis}`}
-            key={index}
-            style={{
-              left: `${edge.x}em`,
-              top: `${edge.y}em`,
-              ...(edge.axis === 'horizontal' ? { width: `${edge.length}em` } : { height: `${edge.length}em` }),
-            }}
-          />
-        ))}
-      </div>
-      <span className="brand-face brand-seal brand-seal-front">knowdium!</span>
-      <span className="brand-face brand-seal brand-seal-back">knowdium!</span>
-      <span className="brand-face brand-face-front">knowdium!</span>
-      <span className="brand-face brand-face-back">knowdium!</span>
-    </div>
-  );
-}
-
-const messages = {
-  en: {
-    tagline: 'A little trivia. A lot of brainpower.',
-    openApps: 'Open apps menu',
-    closeApps: 'Close apps menu',
-    apps: 'My other apps',
-    tryApps: 'Try my other apps',
-    portfolio: 'Portfolio',
-    pharmacy: 'Pharmacy Finder',
-    openInfo: 'About Knowdium',
-    login: 'Log in',
-    theme: 'Toggle light or dark theme',
-    language: 'Choose language',
-    menu: 'Open quick links',
-    closeMenu: 'Close quick links',
-    quickLinks: 'Quick links',
-    howToPlay: 'How to play',
-    gameSettings: 'Game settings',
-    dataSource: 'Question source',
-    kicker: 'YOUR NEXT BRAIN BREAK',
-    headline: 'Make your',
-    headlineAccent: 'curiosity',
-    headlineEnd: 'count.',
-    intro: 'Big questions, quick rounds, and that one fact you can’t wait to tell someone.',
-    play: 'Start a game',
-    settings: 'Customize your game',
-    best: 'PERSONAL BEST',
-    bestPoints: 'points',
-    chooseMode: 'Pick your play style',
-    classic: 'Classic',
-    classicDescription: 'A little bit of everything. Take your time.',
-    blitz: 'Blitz',
-    blitzDescription: 'Fast questions. Faster instincts. 12 seconds each.',
-    survival: 'Survival',
-    survivalDescription: 'Starts easy and gets harder. One wrong answer ends your run.',
-    progressiveDifficulty: 'Increases during Survival',
-    survivalLoading: 'Preparing all difficulty levels takes at least 10 seconds due to the question service’s request limit.',
-    survivalNoQuestions: 'Not enough questions at every difficulty for these settings. Choose fewer questions or change the category or answer type.',
-    sourceNote: 'Questions by Open Trivia DB. Finnish and Russian translations run in your browser.',
-    loading: 'Loading questions…',
-    translating: 'Getting your question ready',
-    translationLoadingDetail: 'On first use, your browser downloads a language model (about 115 MB).',
-    originalQuestion: 'Original question',
-    translationUnavailable: 'The translation model could not be loaded or run. Check your connection and try again, or switch to English.',
-    retryTranslation: 'Retry translation',
-    questions: 'Questions',
-    category: 'Category',
-    allCategories: 'All categories',
-    difficulty: 'Difficulty',
-    anyDifficulty: 'Any difficulty',
-    easy: 'Easy',
-    medium: 'Medium',
-    hard: 'Hard',
-    answerType: 'Answer type',
-    anyType: 'Any type',
-    multipleChoice: 'Multiple choice',
-    trueFalse: 'True or false',
-    questionCount: 'Number of questions',
-    classicTimeLimit: 'Classic time limit per question',
-    noTimeLimit: 'No time limit',
-    nextGameSetting: 'Applies to the next game.',
-    saveSettings: 'Done',
-    close: 'Close',
-    loadingCategories: 'Loading categories…',
-    categoriesUnavailable: 'Categories could not be loaded. You can still play a mixed-category round.',
-    question: 'Question',
-    points: 'POINTS',
-    streak: 'STREAK',
-    seconds: 'sec',
-    timeUp: 'Time’s up!',
-    correct: 'That’s right!',
-    incorrect: 'Not quite!',
-    nextUp: 'Next question coming up…',
-    score: 'Score',
-    finishTitle: 'Round complete',
-    survivalTitle: 'Run over!',
-    finishMessage: 'Nice work. Fancy another round?',
-    survivalMessage: 'The next one is yours. Ready for a rematch?',
-    playAgain: 'Play again',
-    backHome: 'Back to home',
-    accuracy: 'Accuracy',
-    correctAnswers: 'Correct',
-    bestRun: 'Best score',
-    noQuestions: 'No questions matched those settings. Try a different category or question type.',
-    apiInvalid: 'The trivia service did not accept those settings. Please try a different selection.',
-    apiTokenMissing: 'Could not start a trivia session. Please try again.',
-    apiTokenEmpty: 'You’ve seen every question in that session. Starting a fresh session—please try again.',
-    rateLimited: 'The trivia service is taking a breather. Wait five seconds and try again.',
-    apiUnavailable: 'Could not reach the trivia service. Check your connection and try again.',
-    accountsSoon: 'Accounts coming, stay tuned!',
-    aboutTitle: 'A tiny game with a big question bank',
-    aboutBody: 'Knowdium turns the Open Trivia Database into quick, replayable rounds. Choose a pace, set your filters, and see how far your knowledge takes you.',
-    aboutAttribution: 'Questions by Open Trivia Database, licensed under Creative Commons Attribution-ShareAlike 4.0.',
-    aboutApi: 'Questions are fetched live from Open Trivia DB. Finnish and Russian translations run in your browser using Helsinki-NLP models. The first use downloads about 115 MB per language. Machine translations may contain errors.',
-    footerTagline: 'Stay curious. Keep playing.',
-    footerLinks: 'EXPLORE',
-    backToTop: 'Back to top ↑',
-    scoreLabel: 'POINTS',
-  },
-  fi: {
-    tagline: 'Pieni tietovisa. Iso aivojumppa.',
-    openApps: 'Avaa sovellusvalikko',
-    closeApps: 'Sulje sovellusvalikko',
-    apps: 'Muut sovellukseni',
-    tryApps: 'Kokeile muitakin sovelluksiani',
-    portfolio: 'Portfolio',
-    pharmacy: 'Pharmacy Finder',
-    openInfo: 'Tietoa Knowdiumista',
-    login: 'Kirjaudu',
-    theme: 'Vaihda vaalean ja tumman teeman välillä',
-    language: 'Valitse kieli',
-    menu: 'Avaa pikalinkit',
-    closeMenu: 'Sulje pikalinkit',
-    quickLinks: 'Pikalinkit',
-    howToPlay: 'Näin pelaat',
-    gameSettings: 'Pelin asetukset',
-    dataSource: 'Kysymysten lähde',
-    kicker: 'PIENI HETKI AIVOILLE',
-    headline: 'Anna',
-    headlineAccent: 'uteliaisuuden',
-    headlineEnd: 'viedä.',
-    intro: 'Isoja kysymyksiä, nopeita kierroksia ja faktoja, jotka tekee mieli kertoa heti eteenpäin.',
-    play: 'Aloita peli',
-    settings: 'Muokkaa peliä',
-    best: 'OMA ENNÄTYS',
-    bestPoints: 'pistettä',
-    chooseMode: 'Valitse pelityyli',
-    classic: 'Klassikko',
-    classicDescription: 'Kaikkea sopivasti. Ei kiirettä.',
-    blitz: 'Pikakisa',
-    blitzDescription: 'Nopeat kysymykset, nopeat refleksit. 12 sekuntia per kysymys.',
-    survival: 'Selviytyminen',
-    survivalDescription: 'Alkaa helpoista ja vaikeutuu. Yksi väärä vastaus päättää pelin.',
-    progressiveDifficulty: 'Vaikeutuu selviytymisen edetessä',
-    survivalLoading: 'Kaikkien vaikeustasojen haku kestää kysymyspalvelun rajoituksen vuoksi vähintään 10 sekuntia.',
-    survivalNoQuestions: 'Kaikilla vaikeustasoilla ei ole riittävästi kysymyksiä näillä asetuksilla. Vähennä kysymysten määrää tai vaihda kategoriaa tai vastaustyyppiä.',
-    sourceNote: 'Kysymykset: Open Trivia DB. Suomen- ja venäjänkieliset käännökset tehdään selaimessasi.',
-    loading: 'Haetaan kysymyksiä…',
-    translating: 'Seuraava kysymys valmistuu',
-    translationLoadingDetail: 'Ensimmäisellä käyttökerralla selain lataa kielimallin (noin 115 Mt).',
-    originalQuestion: 'Alkuperäinen kysymys',
-    translationUnavailable: 'Käännösmallia ei voitu ladata tai käyttää. Tarkista yhteys ja yritä uudelleen tai vaihda kieleksi englanti.',
-    retryTranslation: 'Yritä käännöstä uudelleen',
-    questions: 'Kysymykset',
-    category: 'Kategoria',
-    allCategories: 'Kaikki kategoriat',
-    difficulty: 'Vaikeustaso',
-    anyDifficulty: 'Kaikki tasot',
-    easy: 'Helppo',
-    medium: 'Keskitaso',
-    hard: 'Vaikea',
-    answerType: 'Vastaustyyppi',
-    anyType: 'Kaikki tyypit',
-    multipleChoice: 'Monivalinta',
-    trueFalse: 'Tosi vai tarua',
-    questionCount: 'Kysymysten määrä',
-    classicTimeLimit: 'Klassikon aikaraja per kysymys',
-    noTimeLimit: 'Ei aikarajaa',
-    nextGameSetting: 'Tulee voimaan seuraavassa pelissä.',
-    saveSettings: 'Valmis',
-    close: 'Sulje',
-    loadingCategories: 'Ladataan kategorioita…',
-    categoriesUnavailable: 'Kategorioita ei saatu ladattua. Voit silti pelata kaikkien kategorioiden kysymyksillä.',
-    question: 'Kysymys',
-    points: 'PISTEET',
-    streak: 'PUTKI',
-    seconds: 's',
-    timeUp: 'Aika loppui!',
-    correct: 'Oikein meni!',
-    incorrect: 'Ei ihan!',
-    nextUp: 'Seuraava kysymys tulossa…',
-    score: 'Pisteet',
-    finishTitle: 'Kierros paketissa',
-    survivalTitle: 'Peli päättyi!',
-    finishMessage: 'Hyvä veto! Otetaanko toinen kierros?',
-    survivalMessage: 'Seuraava menee jo paremmin. Uusinta?',
-    playAgain: 'Pelaa uudelleen',
-    backHome: 'Etusivulle',
-    accuracy: 'Oikein',
-    correctAnswers: 'Oikeita',
-    bestRun: 'Ennätys',
-    noQuestions: 'Näillä asetuksilla ei löytynyt kysymyksiä. Kokeile toista kategoriaa tai vastaustyyppiä.',
-    apiInvalid: 'Tietovisapalvelu ei hyväksynyt näitä asetuksia. Kokeile toista valintaa.',
-    apiTokenMissing: 'Tietovisapalvelua ei saatu käynnistettyä. Yritä uudelleen.',
-    apiTokenEmpty: 'Tämän istunnon kysymykset on jo nähty. Aloitetaan uusi istunto – yritä uudelleen.',
-    rateLimited: 'Tietovisapalvelu hengähtää hetken. Odota viisi sekuntia ja yritä uudelleen.',
-    apiUnavailable: 'Tietovisapalveluun ei saatu yhteyttä. Tarkista verkkoyhteys ja yritä uudelleen.',
-    accountsSoon: 'Käyttäjätilit tulossa – pysy kuulolla!',
-    aboutTitle: 'Pieni peli, iso kysymyspankki',
-    aboutBody: 'Knowdium muuttaa Open Trivia Databasen kysymykset nopeiksi pelattaviksi kierroksiksi. Valitse vauhti, rajaa kysymyksiä ja katso, kuinka pitkälle tietosi kantavat.',
-    aboutAttribution: 'Kysymykset tarjoaa Open Trivia Database, lisenssillä Creative Commons Nimeä-JaaSamoin 4.0.',
-    aboutApi: 'Kysymykset haetaan Open Trivia DB:stä. Suomen- ja venäjänkieliset käännökset tehdään selaimessasi Helsinki-NLP:n kielimalleilla. Ensimmäisellä käyttökerralla ladataan noin 115 Mt kieltä kohden. Konekäännöksissä voi olla virheitä.',
-    footerTagline: 'Pysy uteliaana. Pelaa lisää.',
-    footerLinks: 'TUTUSTU',
-    backToTop: 'Takaisin ylös ↑',
-    scoreLabel: 'PISTEET',
-  },
-  ru: {
-    tagline: 'Немного викторины. Много пользы для мозга.',
-    openApps: 'Открыть меню приложений',
-    closeApps: 'Закрыть меню приложений',
-    apps: 'Другие приложения',
-    tryApps: 'Попробуйте другие приложения',
-    portfolio: 'Портфолио',
-    pharmacy: 'Pharmacy Finder',
-    openInfo: 'О приложении Knowdium',
-    login: 'Войти',
-    theme: 'Переключить светлую или тёмную тему',
-    language: 'Выбрать язык',
-    menu: 'Открыть быстрые ссылки',
-    closeMenu: 'Закрыть быстрые ссылки',
-    quickLinks: 'Быстрые ссылки',
-    howToPlay: 'Как играть',
-    gameSettings: 'Настройки игры',
-    dataSource: 'Источник вопросов',
-    kicker: 'ВРЕМЯ ДЛЯ ТРЕНИРОВКИ МОЗГА',
-    headline: 'Пусть',
-    headlineAccent: 'любопытство',
-    headlineEnd: 'ведёт.',
-    intro: 'Большие вопросы, быстрые раунды и факты, которыми хочется сразу поделиться.',
-    play: 'Начать игру',
-    settings: 'Настроить игру',
-    best: 'ЛИЧНЫЙ РЕКОРД',
-    bestPoints: 'очков',
-    chooseMode: 'Выберите режим игры',
-    classic: 'Классика',
-    classicDescription: 'Всего понемногу. Не торопитесь.',
-    blitz: 'Блиц',
-    blitzDescription: 'Быстрые вопросы и реакция. 12 секунд на ответ.',
-    survival: 'Выживание',
-    survivalDescription: 'От простого к сложному. Одна ошибка завершает игру.',
-    progressiveDifficulty: 'Растёт в режиме выживания',
-    survivalLoading: 'Из-за ограничений сервиса загрузка всех уровней сложности занимает не менее 10 секунд.',
-    survivalNoQuestions: 'Для этих настроек недостаточно вопросов на каждом уровне сложности. Уменьшите количество вопросов или измените категорию либо тип ответа.',
-    sourceNote: 'Вопросы: Open Trivia DB. Перевод на финский и русский выполняется в браузере.',
-    loading: 'Загружаем вопросы…',
-    translating: 'Готовим следующий вопрос',
-    translationLoadingDetail: 'При первом использовании браузер загрузит языковую модель (около 115 МБ).',
-    originalQuestion: 'Оригинал вопроса',
-    translationUnavailable: 'Не удалось загрузить или запустить модель перевода. Проверьте соединение и попробуйте снова или переключитесь на английский.',
-    retryTranslation: 'Повторить перевод',
-    questions: 'Вопросы',
-    category: 'Категория',
-    allCategories: 'Все категории',
-    difficulty: 'Сложность',
-    anyDifficulty: 'Любая сложность',
-    easy: 'Лёгкая',
-    medium: 'Средняя',
-    hard: 'Сложная',
-    answerType: 'Тип ответа',
-    anyType: 'Любой тип',
-    multipleChoice: 'Варианты ответа',
-    trueFalse: 'Верно или неверно',
-    questionCount: 'Количество вопросов',
-    classicTimeLimit: 'Лимит времени на вопрос в классическом режиме',
-    noTimeLimit: 'Без ограничения времени',
-    nextGameSetting: 'Применяется в следующей игре.',
-    saveSettings: 'Готово',
-    close: 'Закрыть',
-    loadingCategories: 'Загружаем категории…',
-    categoriesUnavailable: 'Не удалось загрузить категории. Вы всё ещё можете играть со смешанными категориями.',
-    question: 'Вопрос',
-    points: 'ОЧКИ',
-    streak: 'СЕРИЯ',
-    seconds: 'с',
-    timeUp: 'Время вышло!',
-    correct: 'Правильно!',
-    incorrect: 'Не совсем!',
-    nextUp: 'Следующий вопрос…',
-    score: 'Счёт',
-    finishTitle: 'Раунд завершён',
-    survivalTitle: 'Игра окончена!',
-    finishMessage: 'Отличная игра! Сыграем ещё?',
-    survivalMessage: 'В следующий раз получится лучше. Реванш?',
-    playAgain: 'Играть снова',
-    backHome: 'На главную',
-    accuracy: 'Точность',
-    correctAnswers: 'Правильно',
-    bestRun: 'Рекорд',
-    noQuestions: 'Для этих настроек вопросы не найдены. Попробуйте другую категорию или тип ответа.',
-    apiInvalid: 'Сервис викторины не принял эти настройки. Попробуйте изменить выбор.',
-    apiTokenMissing: 'Не удалось начать сеанс викторины. Попробуйте ещё раз.',
-    apiTokenEmpty: 'В этом сеансе больше нет новых вопросов. Создаём новый сеанс — попробуйте ещё раз.',
-    rateLimited: 'Сервис викторины отдыхает. Подождите пять секунд и попробуйте снова.',
-    apiUnavailable: 'Не удалось подключиться к сервису викторины. Проверьте соединение и попробуйте снова.',
-    accountsSoon: 'Учётные записи скоро появятся!',
-    aboutTitle: 'Небольшая игра с огромной базой вопросов',
-    aboutBody: 'Knowdium превращает Open Trivia Database в короткие игровые раунды. Выберите темп и фильтры, чтобы проверить свои знания.',
-    aboutAttribution: 'Вопросы предоставлены Open Trivia Database по лицензии Creative Commons Attribution-ShareAlike 4.0.',
-    aboutApi: 'Вопросы загружаются из Open Trivia DB. Перевод на финский и русский выполняется в браузере с помощью моделей Helsinki-NLP. При первом использовании загружается около 115 МБ на язык. В машинном переводе возможны ошибки.',
-    footerTagline: 'Будьте любознательны. Играйте ещё.',
-    footerLinks: 'ССЫЛКИ',
-    backToTop: 'Наверх ↑',
-    scoreLabel: 'ОЧКИ',
-  },
-} as const;
-
-type MessageKey = keyof typeof messages.en;
 type HeroTextKey = 'tagline' | 'intro' | 'sourceNote' | 'classicDescription' | 'blitzDescription' | 'survivalDescription';
 
 const languages: Language[] = ['fi', 'en', 'ru'];
@@ -455,12 +85,9 @@ function App() {
   const [mode, setMode] = useState<GameMode>('classic');
   const [classicTimeLimit, setClassicTimeLimit] = useState<number | null>(null);
   const [questionCount, setQuestionCount] = useState(10);
-  const [categoryId, setCategoryId] = useState('');
-  const [difficulty, setDifficulty] = useState('');
-  const [questionType, setQuestionType] = useState('');
-  const [categories, setCategories] = useState<TriviaCategory[]>([]);
-  const [categoriesLoading, setCategoriesLoading] = useState(true);
-  const [categoriesUnavailable, setCategoriesUnavailable] = useState(false);
+  const [categoryIds, setCategoryIds] = useState<string[] | null>(null);
+  const [difficulty, setDifficulty] = useState<TriviaDifficulty | ''>('');
+  const categories = TRIVIA_CATEGORIES;
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [appsOpen, setAppsOpen] = useState(false);
@@ -468,10 +95,10 @@ function App() {
   const [loginOpen, setLoginOpen] = useState(false);
   const loginRef = useRef<HTMLDivElement>(null);
   const loginButtonRef = useRef<HTMLButtonElement>(null);
-  const [hintVisible, setHintVisible] = useState(false);
+  const [appHintVisible, setAppHintVisible] = useState(false);
+  const [gameHintVisible, setGameHintVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [sessionToken, setSessionToken] = useState('');
   const [gameQuestions, setGameQuestions] = useState<Awaited<ReturnType<typeof loadTriviaQuestions>>['questions']>([]);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [score, setScore] = useState(0);
@@ -544,25 +171,6 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const controller = new AbortController();
-    fetchCategories(controller.signal)
-      .then((loadedCategories) => {
-        const untranslated = loadedCategories.filter((category) => !categoryTranslations[category.id]);
-        if (untranslated.length > 0) {
-          console.warn('Missing translations for Open Trivia DB categories:', untranslated);
-        }
-        setCategories(loadedCategories);
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setCategoriesUnavailable(true);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setCategoriesLoading(false);
-      });
-    return () => controller.abort();
-  }, []);
-
-  useEffect(() => {
     const buffer = translationBuffer.current;
     return () => {
       for (const entry of buffer.values()) entry.controller.abort();
@@ -600,8 +208,8 @@ function App() {
   useEffect(() => {
     const showHint = () => {
       if (appsOpen) return;
-      setHintVisible(true);
-      window.setTimeout(() => setHintVisible(false), 3500);
+      setAppHintVisible(true);
+      window.setTimeout(() => setAppHintVisible(false), 3500);
     };
     const interval = window.setInterval(showHint, 12000);
     const initialHint = window.setTimeout(showHint, 1800);
@@ -654,14 +262,11 @@ function App() {
     try {
       const options = {
         amount: questionCount,
-        category: categoryId ? Number(categoryId) : undefined,
-        type: questionType || undefined,
-        token: sessionToken || undefined,
+        categories: categoryIds ?? undefined,
       };
       const result = mode === 'survival'
         ? await loadSurvivalQuestions(options)
         : await loadTriviaQuestions({ ...options, difficulty: difficulty || undefined });
-      setSessionToken(result.token);
       setGameQuestions(result.questions);
       setQuestionIndex(0);
       setScore(0);
@@ -669,6 +274,7 @@ function App() {
       setStreak(0);
       setBestStreak(0);
       setSelectedAnswer(null);
+      setGameHintVisible(false);
       setAnswerLocked(false);
       setAnswerPoints(0);
       setLoadingCardMinHeight(0);
@@ -683,11 +289,8 @@ function App() {
       if (reason instanceof Error) {
         if (reason instanceof NoQuestionsError) setError(t(mode === 'survival' ? 'survivalNoQuestions' : 'noQuestions'));
         else if (reason instanceof TriviaApiError) {
-          const code = reason.responseCode;
-          if (code === 2) setError(t('apiInvalid'));
-          else if (code === 3) setError(t('apiTokenMissing'));
-          else if (code === 4) setError(t('apiTokenEmpty'));
-          else if (code === 5) setError(t('rateLimited'));
+          if (reason.status === 429) setError(t('rateLimited'));
+          else if (reason.status === 400) setError(t('apiInvalid'));
           else setError(t('apiUnavailable'));
         } else setError(t('apiUnavailable'));
       } else {
@@ -735,6 +338,7 @@ function App() {
       }
       rememberQuestionCardHeight();
       setQuestionIndex((index) => index + 1);
+      setGameHintVisible(false);
       setSelectedAnswer(null);
       setAnswerLocked(false);
       setTimeLeft(gameTimeLimit);
@@ -755,6 +359,7 @@ function App() {
     setPhase('home');
     setError('');
     setSelectedAnswer(null);
+    setGameHintVisible(false);
     setAnswerLocked(false);
   }
 
@@ -770,7 +375,7 @@ function App() {
         <div className="info-callout">
           <strong>{t('dataSource')}</strong>
           <p>{t('aboutApi')}</p>
-          <a href="https://opentdb.com/api_config.php" target="_blank" rel="noreferrer">opentdb.com ↗</a>
+          <a href="https://the-trivia-api.com/docs/" target="_blank" rel="noreferrer">the-trivia-api.com ↗</a>
         </div>
         <p className="license-note">{t('aboutAttribution')}</p>
       </section>
@@ -785,35 +390,54 @@ function App() {
         <button className="dialog-close" type="button" aria-label={t('close')} onClick={() => setSettingsOpen(false)}>×</button>
         <span className="eyebrow">{t('gameSettings')}</span>
         <h2 id="settings-title">{t('settings')}</h2>
-        {categoriesUnavailable && <p className="category-notice" role="status">{t('categoriesUnavailable')}</p>}
         <div className="settings-grid">
-          <label className="setting-field">
-            <span>{t('category')}</span>
-            <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
-              <option value="">{t('allCategories')}</option>
-              {categories.map((category) => (
-                <option value={category.id} key={category.id}>
-                  {language === 'en' ? category.name : categoryTranslations[category.id]?.[language] ?? category.name}
-                </option>
-              ))}
-            </select>
-            {categoriesLoading && <small>{t('loadingCategories')}</small>}
-          </label>
+          <div className="category-setting">
+            <div className="category-setting-heading">
+              <span>{t('category')}</span>
+              <span>{categoryIds === null ? t('allCategories') : `${categoryIds.length} ${t('selectedCategories')}`}</span>
+            </div>
+            <div className="category-picker" role="group" aria-label={t('category')}>
+              <button
+                className={`category-option${categoryIds === null ? ' is-selected' : ''}`}
+                type="button"
+                aria-pressed={categoryIds === null}
+                onClick={() => setCategoryIds(null)}
+              >
+                {t('allCategories')}
+              </button>
+              {categories.map((category) => {
+                const selected = categoryIds?.includes(category.id) ?? false;
+                return (
+                  <button
+                    className={`category-option${selected ? ' is-selected' : ''}`}
+                    type="button"
+                    aria-pressed={selected}
+                    key={category.id}
+                    onClick={() => setCategoryIds((current) => {
+                      if (current === null) return [category.id];
+                      const next = current.includes(category.id)
+                        ? current.filter((id) => id !== category.id)
+                        : [...current, category.id];
+                      return next.length ? next : null;
+                    })}
+                  >
+                    {language === 'en' ? category.name : categoryTranslations[category.id][language]}
+                  </button>
+                );
+              })}
+            </div>
+            <small className="category-setting-help">{t('categorySelectionHelp')}</small>
+          </div>
           <label className="setting-field">
             <span>{t('difficulty')}</span>
-            <select value={mode === 'survival' ? '' : difficulty} disabled={mode === 'survival'} onChange={(event) => setDifficulty(event.target.value)}>
+            <select value={mode === 'survival' ? '' : difficulty} disabled={mode === 'survival'} onChange={(event) => {
+              const value = event.target.value;
+              setDifficulty(value === 'easy' || value === 'medium' || value === 'hard' ? value : '');
+            }}>
               <option value="">{t(mode === 'survival' ? 'progressiveDifficulty' : 'anyDifficulty')}</option>
               <option value="easy">{t('easy')}</option>
               <option value="medium">{t('medium')}</option>
               <option value="hard">{t('hard')}</option>
-            </select>
-          </label>
-          <label className="setting-field">
-            <span>{t('answerType')}</span>
-            <select value={questionType} onChange={(event) => setQuestionType(event.target.value)}>
-              <option value="">{t('anyType')}</option>
-              <option value="multiple">{t('multipleChoice')}</option>
-              <option value="boolean">{t('trueFalse')}</option>
             </select>
           </label>
           <label className="setting-field">
@@ -855,12 +479,12 @@ function App() {
                 setAppsOpen((open) => !open);
                 setMenuOpen(false);
                 setLoginOpen(false);
-                setHintVisible(false);
+                setAppHintVisible(false);
               }}
             >
               <img className="brand-mark" src={`${import.meta.env.BASE_URL}knowdium-logo.svg`} alt="" />
             </button>
-            {hintVisible && !appsOpen && (
+            {appHintVisible && !appsOpen && (
               <span className="app-switcher-hint" aria-hidden="true">
                 <svg viewBox="0 0 16 16"><path d="m4 10 4-4 4 4" /></svg>
                 <span>{t('tryApps')}</span>
@@ -955,7 +579,7 @@ function App() {
                 <nav className="quick-menu" id="quick-menu" aria-label={t('quickLinks')}>
                   <button type="button" onClick={() => { setInfoOpen(true); setMenuOpen(false); }}>{t('howToPlay')}</button>
                   <button type="button" onClick={() => { setSettingsOpen(true); setMenuOpen(false); }}>{t('gameSettings')}</button>
-                  <a href="https://opentdb.com/api_config.php" target="_blank" rel="noreferrer">{t('dataSource')} ↗</a>
+                  <a href="https://the-trivia-api.com/docs/" target="_blank" rel="noreferrer">{t('dataSource')} ↗</a>
                 </nav>
               )}
             </div>
@@ -1001,8 +625,8 @@ function App() {
                   </button>
                 </div>
                 {error && <p className="error-message home-error" role="alert">{error}</p>}
-                {loading && mode === 'survival' && <p className="api-note" role="status">{t('survivalLoading')}</p>}
                 <StableHeroText language={language} text="sourceNote" className="api-note" />
+                {language !== 'en' && <p className="translation-beta-note" role="note">{t('translationBetaNote')}</p>}
               </div>
               <div className="hero-art" aria-label="Knowdium, a trivia game">
                 <span className="orbit-word orbit-word-one" aria-hidden="true">kd!</span>
@@ -1067,13 +691,24 @@ function App() {
               </div>
               <span className="question-number">Q{String(questionIndex + 1).padStart(2, '0')}</span>
               <h1>{displayedQuestion.question}</h1>
+              {mode === 'classic' && gameTimeLimit === null && displayedQuestion.hint && (
+                <div className="game-hint">
+                  {gameHintVisible ? (
+                    <p><strong>✦ {t('hint')}:</strong> {displayedQuestion.hint}</p>
+                  ) : (
+                    <button className="hint-button" type="button" onClick={() => setGameHintVisible(true)}>
+                      <span aria-hidden="true">✦</span> {t('showHint')}
+                    </button>
+                  )}
+                </div>
+              )}
               {language !== 'en' && (
                 <details className="original-question">
                   <summary>{t('originalQuestion')}</summary>
                   <p lang="en">{currentQuestion.question}</p>
                 </details>
               )}
-              <div className={`answer-grid${currentQuestion.type === 'boolean' ? ' answer-grid-binary' : ''}`}>
+              <div className="answer-grid">
                 {currentQuestion.answers.map((answer, index) => {
                   const isCorrect = answerLocked && answer === currentQuestion.correctAnswer;
                   const isWrong = answerLocked && selectedAnswer === answer && answer !== currentQuestion.correctAnswer;
@@ -1119,7 +754,6 @@ function App() {
               <button className="secondary-button" type="button" onClick={returnHome} disabled={loading}>{t('backHome')}</button>
             </div>
             {error && <p className="error-message" role="alert">{error}</p>}
-            {loading && mode === 'survival' && <p className="api-note" role="status">{t('survivalLoading')}</p>}
           </main>
         )}
       </div>
@@ -1133,11 +767,11 @@ function App() {
             <a href="https://hiltunenjuho.github.io/nearest-pharmacy-web/" target="_blank" rel="noreferrer">{t('pharmacy')}</a>
             <a href="https://github.com/hiltunenjuho" target="_blank" rel="noopener noreferrer">GitHub</a>
             <a href="https://www.linkedin.com/in/hiltunenjuho/" target="_blank" rel="noopener noreferrer">LinkedIn</a>
-            <a href="https://opentdb.com/api_config.php" target="_blank" rel="noreferrer">{t('dataSource')}</a>
+            <a href="https://the-trivia-api.com/docs/" target="_blank" rel="noreferrer">{t('dataSource')}</a>
           </div>
           <div className="footer-bottom">
             <span>© {new Date().getFullYear()} Juho Hiltunen</span>
-            <span>Questions via <a href="https://opentdb.com/" target="_blank" rel="noreferrer">Open Trivia DB</a> · <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noreferrer">CC BY-SA 4.0</a></span>
+            <span>Questions via <a href="https://the-trivia-api.com/" target="_blank" rel="noreferrer">The Trivia API</a></span>
             <a className="back-to-top" href="#top" onClick={(event) => { event.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>{t('backToTop')}</a>
           </div>
         </div>

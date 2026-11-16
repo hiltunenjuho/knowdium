@@ -1,104 +1,86 @@
 export interface TriviaCategory {
-  id: number;
+  id: string;
   name: string;
 }
 
 export interface TriviaQuestion {
+  id: string;
   question: string;
   correctAnswer: string;
   answers: string[];
   category: string;
-  difficulty: 'easy' | 'medium' | 'hard';
-  type: 'multiple' | 'boolean';
+  difficulty: TriviaDifficulty;
+  hint?: string;
 }
+
+export type TriviaDifficulty = 'easy' | 'medium' | 'hard';
 
 export interface TriviaOptions {
   amount: number;
-  category?: number;
-  difficulty?: string;
-  type?: string;
-  token?: string;
+  categories?: string[];
+  difficulty?: TriviaDifficulty;
 }
 
-export class TriviaApiError extends Error {
-  responseCode: number;
+export const TRIVIA_CATEGORIES: TriviaCategory[] = [
+  { id: 'general_knowledge', name: 'General knowledge' },
+  { id: 'arts_and_literature', name: 'Arts and literature' },
+  { id: 'film_and_tv', name: 'Film and TV' },
+  { id: 'food_and_drink', name: 'Food and drink' },
+  { id: 'geography', name: 'Geography' },
+  { id: 'history', name: 'History' },
+  { id: 'music', name: 'Music' },
+  { id: 'science', name: 'Science' },
+  { id: 'society_and_culture', name: 'Society and culture' },
+  { id: 'sport_and_leisure', name: 'Sport and leisure' },
+];
 
-  constructor(responseCode: number) {
-    super(`Open Trivia DB returned response code ${responseCode}`);
+export class TriviaApiError extends Error {
+  status: number;
+
+  constructor(status: number) {
+    super(`The Trivia API returned HTTP ${status}`);
     this.name = 'TriviaApiError';
-    this.responseCode = responseCode;
+    this.status = status;
   }
 }
 
 export class NoQuestionsError extends Error {
   constructor() {
-    super('Open Trivia DB found no questions for this selection');
+    super('The Trivia API returned too few non-niche questions for this selection');
     this.name = 'NoQuestionsError';
   }
 }
 
 interface ApiQuestion {
-  question: string;
-  correct_answer: string;
-  incorrect_answers: string[];
+  id: string;
   category: string;
-  difficulty: 'easy' | 'medium' | 'hard';
-  type: 'multiple' | 'boolean';
+  difficulty: TriviaDifficulty;
+  question: { text: string };
+  correctAnswer: string;
+  incorrectAnswers: string[];
+  isNiche: boolean;
+  hint?: string;
 }
 
-interface ApiQuestionResponse {
-  response_code: number;
-  results: ApiQuestion[];
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
 }
 
-interface ApiTokenResponse {
-  response_code: number;
-  response_message?: string;
-  token: string;
+function isApiQuestion(value: unknown): value is ApiQuestion {
+  if (!isRecord(value) || !isRecord(value.question)) return false;
+  return typeof value.id === 'string' &&
+    typeof value.category === 'string' &&
+    (value.difficulty === 'easy' || value.difficulty === 'medium' || value.difficulty === 'hard') &&
+    typeof value.question.text === 'string' &&
+    typeof value.correctAnswer === 'string' &&
+    Array.isArray(value.incorrectAnswers) &&
+    value.incorrectAnswers.every((answer) => typeof answer === 'string') &&
+    typeof value.isNiche === 'boolean' &&
+    (value.hint === undefined || typeof value.hint === 'string');
 }
 
-interface ApiCategoryResponse {
-  trivia_categories: TriviaCategory[];
-}
-
-const API_BASE = 'https://opentdb.com';
-const QUESTION_REQUEST_INTERVAL = 5100;
-
-function waitForQuestionRequest(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, QUESTION_REQUEST_INTERVAL));
-}
-
-function decodeBase64(value: string): string {
-  const bytes = Uint8Array.from(atob(value), (character) => character.charCodeAt(0));
-  return new TextDecoder().decode(bytes);
-}
-
-async function requestJson<T>(url: string, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(url, { signal });
-  if (response.status === 429) throw new TriviaApiError(5);
-  if (!response.ok) throw new Error(`Open Trivia DB returned HTTP ${response.status}`);
-  return response.json() as Promise<T>;
-}
-
-export async function fetchCategories(signal?: AbortSignal): Promise<TriviaCategory[]> {
-  const response = await requestJson<ApiCategoryResponse>(`${API_BASE}/api_category.php`, signal);
-  if (!Array.isArray(response.trivia_categories)) throw new Error('Invalid category response from Open Trivia DB');
-  return response.trivia_categories;
-}
-
-async function requestToken(): Promise<string> {
-  const response = await requestJson<ApiTokenResponse>(`${API_BASE}/api_token.php?command=request`);
-  if (response.response_code !== 0 || !response.token) {
-    throw new TriviaApiError(response.response_code);
-  }
-  return response.token;
-}
-
-async function resetToken(token: string): Promise<void> {
-  const params = new URLSearchParams({ command: 'reset', token });
-  const response = await requestJson<ApiTokenResponse>(`${API_BASE}/api_token.php?${params}`);
-  if (response.response_code !== 0) throw new TriviaApiError(response.response_code);
-}
+const API_BASE = 'https://the-trivia-api.com/v2/questions';
+const MAX_QUESTIONS_PER_REQUEST = 50;
 
 function shuffle<T>(items: T[]): T[] {
   for (let index = items.length - 1; index > 0; index -= 1) {
@@ -108,67 +90,67 @@ function shuffle<T>(items: T[]): T[] {
   return items;
 }
 
-export async function loadTriviaQuestions(options: TriviaOptions): Promise<{ questions: TriviaQuestion[]; token: string }> {
-  let token = options.token || await requestToken();
+async function requestQuestions(options: TriviaOptions & { limit: number }): Promise<TriviaQuestion[]> {
   const params = new URLSearchParams({
-    amount: String(options.amount),
-    encode: 'base64',
-    token,
+    limit: String(options.limit),
+    contentFilter: 'family',
   });
-  if (options.category) params.set('category', String(options.category));
-  if (options.difficulty) params.set('difficulty', options.difficulty);
-  if (options.type) params.set('type', options.type);
+  if (options.categories?.length) params.set('categories', options.categories.join(','));
+  if (options.difficulty) params.set('difficulties', options.difficulty);
 
-  let response = await requestJson<ApiQuestionResponse>(`${API_BASE}/api.php?${params}`);
-  if (response.response_code === 4) {
-    await resetToken(token);
-    await waitForQuestionRequest();
-    response = await requestJson<ApiQuestionResponse>(`${API_BASE}/api.php?${params}`);
-  } else if (response.response_code === 3) {
-    token = await requestToken();
-    params.set('token', token);
-    await waitForQuestionRequest();
-    response = await requestJson<ApiQuestionResponse>(`${API_BASE}/api.php?${params}`);
+  const response = await fetch(`${API_BASE}?${params}`);
+  if (!response.ok) throw new TriviaApiError(response.status);
+  const data: unknown = await response.json();
+  if (!Array.isArray(data) || !data.every(isApiQuestion)) {
+    throw new Error('The Trivia API returned an invalid question list');
   }
 
-  if (response.response_code === 1) throw new NoQuestionsError();
-  if (response.response_code !== 0) throw new TriviaApiError(response.response_code);
-
-  const questions = response.results.map((question) => ({
-    question: decodeBase64(question.question),
-    correctAnswer: decodeBase64(question.correct_answer),
-    answers: shuffle([
-      ...question.incorrect_answers.map(decodeBase64),
-      decodeBase64(question.correct_answer),
-    ]),
-    category: decodeBase64(question.category),
-    difficulty: question.difficulty,
-    type: question.type,
-  }));
-  return { questions, token };
+  return data
+    .filter((question) => !question.isNiche)
+    .map((question) => ({
+      id: question.id,
+      question: question.question.text,
+      correctAnswer: question.correctAnswer,
+      answers: shuffle([...question.incorrectAnswers, question.correctAnswer]),
+      category: question.category.replaceAll('_', ' '),
+      difficulty: question.difficulty,
+      ...(question.hint?.trim() ? { hint: question.hint } : {}),
+    }));
 }
 
-export async function loadSurvivalQuestions(options: Omit<TriviaOptions, 'difficulty'>): Promise<{ questions: TriviaQuestion[]; token: string }> {
-  if (!Number.isInteger(options.amount) || options.amount < 1 || options.amount > 50) {
+function selectQuestions(questions: TriviaQuestion[], amount: number): TriviaQuestion[] {
+  if (questions.length < amount) throw new NoQuestionsError();
+  return shuffle(questions).slice(0, amount);
+}
+
+export async function loadTriviaQuestions(options: TriviaOptions): Promise<{ questions: TriviaQuestion[] }> {
+  if (!Number.isInteger(options.amount) || options.amount < 1 || options.amount > MAX_QUESTIONS_PER_REQUEST) {
+    throw new RangeError('Question count must be between 1 and 50');
+  }
+
+  const questions = await requestQuestions({ ...options, limit: MAX_QUESTIONS_PER_REQUEST });
+  if (options.difficulty) {
+    return { questions: selectQuestions(questions.filter((question) => question.difficulty === options.difficulty), options.amount) };
+  }
+  return { questions: selectQuestions(questions, options.amount) };
+}
+
+export async function loadSurvivalQuestions(options: TriviaOptions): Promise<{ questions: TriviaQuestion[] }> {
+  if (!Number.isInteger(options.amount) || options.amount < 1 || options.amount > MAX_QUESTIONS_PER_REQUEST) {
     throw new RangeError('Survival question count must be between 1 and 50');
   }
 
   const difficulties = ['easy', 'medium', 'hard'] as const;
-  const questions: TriviaQuestion[] = [];
-  let token = options.token;
-
-  for (const [index, difficulty] of difficulties.entries()) {
-    const amount = Math.floor(options.amount / difficulties.length) + (index < options.amount % difficulties.length ? 1 : 0);
-    if (amount === 0) continue;
-    if (questions.length > 0) await waitForQuestionRequest();
-    const result = await loadTriviaQuestions({ ...options, amount, difficulty, token });
-    if (result.questions.length !== amount || result.questions.some((question) => question.difficulty !== difficulty)) {
-      throw new Error(`Open Trivia DB returned an invalid ${difficulty} question batch`);
-    }
-    questions.push(...result.questions);
-    token = result.token;
-  }
-
-  if (!token) throw new Error('Could not create a survival trivia session');
-  return { questions, token };
+  const counts = difficulties.map((_, index) =>
+    Math.floor(options.amount / difficulties.length) + (index < options.amount % difficulties.length ? 1 : 0),
+  );
+  const batches = await Promise.all(difficulties.map((difficulty, index) =>
+    counts[index] === 0
+      ? Promise.resolve([])
+      : requestQuestions({ ...options, difficulty, limit: MAX_QUESTIONS_PER_REQUEST }),
+  ));
+  const questions = batches.flatMap((batch, index) =>
+    selectQuestions(batch.filter((question) => question.difficulty === difficulties[index]), counts[index]),
+  );
+  return { questions };
 }

@@ -6,6 +6,7 @@ export interface TranslatedQuestion {
   question: string;
   answers: string[];
   category: string;
+  hint?: string;
 }
 
 export type TranslationRequest =
@@ -75,24 +76,27 @@ export async function translateQuestion(
   language: TranslationLanguage,
   signal: AbortSignal,
 ): Promise<TranslatedQuestion> {
-  const booleanAnswers = language === 'fi'
-    ? { True: 'Tosi', False: 'Epätosi' }
-    : { True: 'Верно', False: 'Неверно' };
   const preserveAnswer = (answer: string) =>
-    (question.type === 'boolean' && (answer === 'True' || answer === 'False')) ||
-    (/\bSQL\b/i.test(question.question) && /^[A-Z][A-Z0-9_]*$/.test(answer));
+    /\bSQL\b/i.test(question.question) && /^[A-Z][A-Z0-9_]*$/.test(answer);
   const answersToTranslate = question.answers.filter((answer) =>
     !preserveAnswer(answer),
   );
-  const [translatedQuestion, category, ...translatedAnswers] = await translateTexts(
-    [question.question, question.category, ...answersToTranslate],
+  const [translatedQuestion, category, ...translatedContent] = await translateTexts(
+    [
+      question.question,
+      question.category,
+      ...(question.hint ? [question.hint] : []),
+      ...answersToTranslate,
+    ],
     language,
     signal,
   );
+  const translatedHint = question.hint ? translatedContent[0] : undefined;
+  const translatedAnswers = translatedContent.slice(question.hint ? 1 : 0);
   let answerIndex = 0;
   const answers = question.answers.map((answer) =>
     preserveAnswer(answer)
-      ? answer === 'True' || answer === 'False' ? booleanAnswers[answer] : answer
+      ? answer
       : translatedAnswers[answerIndex++],
   );
   const normalizedAnswers = answers.map((answer) => answer.trim().toLocaleLowerCase(language));
@@ -105,6 +109,7 @@ export async function translateQuestion(
   return {
     question: questionText,
     category,
+    ...(translatedHint ? { hint: translatedHint } : {}),
     answers: answers.map((answer, index) =>
       normalizedAnswers.indexOf(normalizedAnswers[index]) !== normalizedAnswers.lastIndexOf(normalizedAnswers[index])
         ? `${answer} (${question.answers[index]})`
