@@ -90,6 +90,9 @@ function App() {
   const categories = TRIVIA_CATEGORIES;
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
+  const [infoPage, setInfoPage] = useState<'about' | 'nerds'>('about');
+  const infoDialogRef = useRef<HTMLElement>(null);
+  const infoTitleRef = useRef<HTMLHeadingElement>(null);
   const [appsOpen, setAppsOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -157,6 +160,12 @@ function App() {
     document.documentElement.lang = language;
     document.documentElement.dataset.theme = theme;
   }, [language, theme]);
+
+  useEffect(() => {
+    if (!infoOpen) return;
+    if (infoDialogRef.current) infoDialogRef.current.scrollTop = 0;
+    infoTitleRef.current?.focus({ preventScroll: true });
+  }, [infoOpen, infoPage]);
 
   useEffect(() => {
     const preference = window.matchMedia('(prefers-color-scheme: dark)');
@@ -363,21 +372,48 @@ function App() {
     setAnswerLocked(false);
   }
 
+  function openInfo() {
+    setInfoPage('about');
+    setInfoOpen(true);
+  }
+
   const infoDialog = infoOpen && (
     <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget) setInfoOpen(false);
     }}>
-      <section className="dialog-card info-dialog" role="dialog" aria-modal="true" aria-labelledby="info-title">
+      <section ref={infoDialogRef} className="dialog-card info-dialog" role="dialog" aria-modal="true" aria-labelledby="info-title">
         <button className="dialog-close" type="button" aria-label={t('close')} onClick={() => setInfoOpen(false)}>×</button>
-        <span className="eyebrow">{t('openInfo')}</span>
-        <h2 id="info-title">{t('aboutTitle')}</h2>
-        <p>{t('aboutBody')}</p>
-        <div className="info-callout">
-          <strong>{t('dataSource')}</strong>
-          <p>{t('aboutApi')}</p>
-          <a href="https://the-trivia-api.com/docs/" target="_blank" rel="noreferrer">the-trivia-api.com ↗</a>
-        </div>
-        <p className="license-note">{t('aboutAttribution')}</p>
+        {infoPage === 'about' ? (
+          <>
+            <span className="eyebrow">{t('openInfo')}</span>
+            <h2 ref={infoTitleRef} id="info-title" tabIndex={-1}>{t('aboutTitle')}</h2>
+            <p>{t('aboutBody')}</p>
+            <h3>{t('aboutModesTitle')}</h3>
+            <p>{t('aboutModes')}</p>
+            <h3>{t('aboutScoringTitle')}</h3>
+            <p>{t('aboutScoring')}</p>
+            <div className="info-callout">
+              <strong>{t('dataSource')}</strong>
+              <p>{t('aboutApi')}</p>
+              <a href="https://the-trivia-api.com/docs/" target="_blank" rel="noreferrer">the-trivia-api.com ↗</a>
+            </div>
+            <p className="license-note">{t('aboutAttribution')}</p>
+            <div className="info-dialog-actions">
+              <button className="primary-button" type="button" onClick={() => setInfoPage('nerds')}>{t('infoForNerds')}</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <button className="secondary-button info-back-button" type="button" onClick={() => setInfoPage('about')}>← {t('infoBack')}</button>
+            <h2 ref={infoTitleRef} id="info-title" tabIndex={-1}>{t('infoTechnicalTitle')}</h2>
+            <h3>{t('infoTechAppTitle')}</h3>
+            <p>{t('infoTechApp')}</p>
+            <h3>{t('infoTechTranslationTitle')}</h3>
+            <p>{t('infoTechTranslation')}</p>
+            <h3>{t('infoTechFutureTitle')}</h3>
+            <p>{t('infoTechFuture')}</p>
+          </>
+        )}
       </section>
     </div>
   );
@@ -509,7 +545,7 @@ function App() {
             )}
           </div>
           <div className="topbar-tools">
-            <button className="icon-button info-button" type="button" aria-label={t('openInfo')} onClick={() => setInfoOpen(true)}>
+            <button className="icon-button info-button" type="button" aria-label={t('openInfo')} onClick={openInfo}>
               <span aria-hidden="true">i</span>
             </button>
             <div className="login-wrap" ref={loginRef}>
@@ -577,7 +613,7 @@ function App() {
               </button>
               {menuOpen && (
                 <nav className="quick-menu" id="quick-menu" aria-label={t('quickLinks')}>
-                  <button type="button" onClick={() => { setInfoOpen(true); setMenuOpen(false); }}>{t('howToPlay')}</button>
+                  <button type="button" onClick={() => { openInfo(); setMenuOpen(false); }}>{t('howToPlay')}</button>
                   <button type="button" onClick={() => { setSettingsOpen(true); setMenuOpen(false); }}>{t('gameSettings')}</button>
                   <a href="https://the-trivia-api.com/docs/" target="_blank" rel="noreferrer">{t('dataSource')} ↗</a>
                 </nav>

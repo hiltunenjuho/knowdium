@@ -1248,6 +1248,9 @@ select:focus-visible {
 .dialog-close:hover { border-color: var(--purple); color: var(--text); }
 .dialog-card h2 { margin: 9px 44px 18px 0; font-size: 1.75rem; letter-spacing: -0.045em; }
 .info-dialog > p { color: var(--text-muted); font-size: 0.9rem; line-height: 1.75; }
+.info-dialog h3 { margin: 20px 0 6px; color: var(--purple-bright); font-size: 0.95rem; }
+.info-dialog-actions { display: flex; justify-content: flex-end; margin-top: 22px; }
+.info-back-button { margin-bottom: 20px; }
 .info-callout { margin-top: 22px; padding: 17px; border: 1px solid var(--line); border-radius: 13px; background: var(--page-bg-raised); }
 .info-callout strong { color: var(--purple-bright); font-size: 0.8rem; }
 .info-callout p { color: var(--text-muted); font-size: 0.8rem; line-height: 1.65; }
