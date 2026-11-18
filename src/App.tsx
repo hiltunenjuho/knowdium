@@ -533,13 +533,13 @@ function App() {
             {appsOpen && (
               <nav className="app-switcher-menu" id="app-switcher-menu" aria-label={t('apps')}>
                 <a className="app-switcher-item" href="https://hiltunenjuho.github.io/">
-                  <img className="switcher-symbol" src={`${import.meta.env.BASE_URL}portfolio-logo.svg`} alt="" /><span className="switcher-name-portfolio">{t('portfolio')}</span><span className="external-arrow">↗</span>
+                  <img className="switcher-symbol" src={`${import.meta.env.BASE_URL}portfolio-logo.svg`} alt="" /><span className="switcher-name switcher-name-portfolio">{t('portfolio')}</span>
                 </a>
                 <a className="app-switcher-item" href="https://hiltunenjuho.github.io/nearest-pharmacy-web/">
-                  <img className="switcher-symbol" src={`${import.meta.env.BASE_URL}pharmacy-logo.svg`} alt="" /><span>{t('pharmacy')}</span><span className="external-arrow">↗</span>
+                  <img className="switcher-symbol" src={`${import.meta.env.BASE_URL}pharmacy-logo.svg`} alt="" /><span className="switcher-name">{t('pharmacy')}</span>
                 </a>
                 <a className="app-switcher-item is-current" href="https://hiltunenjuho.github.io/knowdium/" aria-current="page">
-                  <img className="switcher-symbol" src={`${import.meta.env.BASE_URL}knowdium-logo.svg`} alt="" /><span className="switcher-name-knowdium">knowdium!</span><span className="current-dot" />
+                  <img className="switcher-symbol" src={`${import.meta.env.BASE_URL}knowdium-logo.svg`} alt="" /><span className="switcher-name switcher-name-knowdium">knowdium!</span>
                 </a>
               </nav>
             )}
