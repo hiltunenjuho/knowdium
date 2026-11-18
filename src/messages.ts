@@ -7,7 +7,7 @@ export const messages = {
     closeApps: 'Close apps menu',
     apps: 'My other apps',
     tryApps: 'Try my other apps',
-    portfolio: 'Portfolio',
+    portfolio: 'Portfolio Website',
     pharmacy: 'Pharmacy Finder',
     openInfo: 'About Knowdium',
     login: 'Log in',

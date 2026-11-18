@@ -539,7 +539,7 @@ function App() {
                   <img className="switcher-symbol" src={`${import.meta.env.BASE_URL}pharmacy-logo.svg`} alt="" /><span className="switcher-name">{t('pharmacy')}</span>
                 </a>
                 <a className="app-switcher-item is-current" href="https://hiltunenjuho.github.io/knowdium/" aria-current="page">
-                  <img className="switcher-symbol" src={`${import.meta.env.BASE_URL}knowdium-logo.svg`} alt="" /><span className="switcher-name switcher-name-knowdium">knowdium!</span>
+                  <img className="switcher-symbol" src={`${import.meta.env.BASE_URL}knowdium-logo.svg`} alt="" /><img className="switcher-name switcher-wordmark" src={`${import.meta.env.BASE_URL}Honk-styled-text-transparent-1x-319x81px.png`} alt="knowdium!" />
                 </a>
               </nav>
             )}
