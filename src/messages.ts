@@ -114,7 +114,7 @@ export const messages = {
     closeApps: 'Sulje sovellusvalikko',
     apps: 'Muut sovellukseni',
     tryApps: 'Kokeile muitakin sovelluksiani',
-    portfolio: 'Portfolio',
+    portfolio: 'Portfolio Website',
     pharmacy: 'Pharmacy Finder',
     openInfo: 'Tietoa Knowdiumista',
     login: 'Kirjaudu',
