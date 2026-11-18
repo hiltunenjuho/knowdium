@@ -270,7 +270,7 @@ select:focus-visible {
 }
 
 .switcher-name { min-width: 0; }
-.switcher-name-portfolio { font-family: Georgia, serif; font-weight: 700; }
+.switcher-name-portfolio { font-family: "Noto Serif Display", serif; font-weight: 600; }
 .switcher-wordmark {
   display: block;
   flex: 0 0 112px;
